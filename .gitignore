@@ -46,9 +46,3 @@ build/
 # OS specific
 .DS_Store
 Thumbs.db
-
-# Application specific
-application*.yml
-application*.properties
-!application-example.yml
-!application-example.properties
