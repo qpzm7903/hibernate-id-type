@@ -8,7 +8,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/persons")
@@ -23,7 +25,9 @@ public class PersonController {
 
     @GetMapping
     public ResponseEntity<List<Person>> getAllPersons() {
-        return ResponseEntity.ok(personService.findAll());
+        List<Person> all = personService.findAll();
+        List<Person> sortedPersons = all.stream().sorted(Comparator.comparing(Person::getId)).collect(Collectors.toList());
+        return ResponseEntity.ok(sortedPersons);
     }
 
     @GetMapping("/{id}")

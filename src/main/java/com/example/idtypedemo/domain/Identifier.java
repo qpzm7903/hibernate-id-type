@@ -14,7 +14,7 @@ import java.util.Objects;
  * This class is immutable and provides type-safe conversion methods.
  * Behavior can be configured globally through application properties.
  */
-public final class Identifier implements Serializable {
+public final class Identifier implements Serializable, Comparable<Identifier> {
     
     private static final long serialVersionUID = 1L;
     
@@ -181,5 +181,10 @@ public final class Identifier implements Serializable {
         } else {
             return Objects.hash(value, type);
         }
+    }
+    
+    @Override
+    public int compareTo(Identifier other) {
+        return this.toString().compareTo(other.toString());
     }
 } 
