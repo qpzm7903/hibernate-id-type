@@ -2,15 +2,18 @@ package com.example.idtypedemo.domain.entities;
 
 import com.example.idtypedemo.domain.Identifier;
 import com.example.idtypedemo.type.IdentifierType;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import org.hibernate.annotations.GenericGenerator;
 import org.hibernate.annotations.Type;
 
 @Entity
@@ -19,10 +22,13 @@ import org.hibernate.annotations.Type;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@Setter
 public class Person {
     
     @Id
     @Type(IdentifierType.class)
+    @GeneratedValue(generator = "custom-identifier")
+    @GenericGenerator(name = "custom-identifier", strategy = "com.example.idtypedemo.type.CustomIdentifierGenerator")
     private Identifier id;
     
     private String name;
@@ -42,6 +48,19 @@ public class Person {
     public static Person withStringId(String id, String name, Integer age) {
         return Person.builder()
                 .id(id != null ? Identifier.of(id) : null)
+                .name(name)
+                .age(age)
+                .build();
+    }
+    
+    // JSON constructor for deserialization
+    @JsonCreator
+    public static Person fromJson(
+            @JsonProperty("id") Identifier id,
+            @JsonProperty("name") String name,
+            @JsonProperty("age") Integer age) {
+        return Person.builder()
+                .id(id)
                 .name(name)
                 .age(age)
                 .build();

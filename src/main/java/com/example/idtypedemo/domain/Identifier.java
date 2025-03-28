@@ -1,6 +1,8 @@
 package com.example.idtypedemo.domain;
 
 import com.example.idtypedemo.config.IdentifierProperties;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -132,9 +134,23 @@ public final class Identifier implements Serializable {
         return type == Type.STRING;
     }
     
+    @JsonValue
     @Override
     public String toString() {
         return value.toString();
+    }
+    
+    @JsonCreator
+    public static Identifier fromString(String value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            Long longValue = Long.parseLong(value);
+            return Identifier.of(longValue);
+        } catch (NumberFormatException e) {
+            return Identifier.of(value);
+        }
     }
     
     @Override
