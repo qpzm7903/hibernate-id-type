@@ -59,8 +59,8 @@ public final class Identifier implements Serializable {
      * Factory method to create a String-based identifier
      */
     public static Identifier of(String value) {
-        // Try to automatically convert to Long if configured and possible
-        if (properties != null && properties.isAutoConvertStringToLong()) {
+        // Only auto-convert to Long if configured and not explicitly requesting STRING type
+        if (properties != null && properties.isAutoConvertStringToLong() && properties.getDefaultType().equalsIgnoreCase("LONG")) {
             try {
                 Long longValue = Long.parseLong(value);
                 return new Identifier(longValue, Type.LONG);

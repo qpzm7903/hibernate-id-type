@@ -1,0 +1,52 @@
+---
+description: Apply this rule when making changes to Java code in Maven projects to ensure build and test integrity
+globs: 
+alwaysApply: false
+---
+
+# Maven Build and Test Validation
+
+## Context
+
+- Ensures code changes maintain project stability
+- Prevents integration of broken code
+- Maintains test coverage and build integrity
+- Applies to all Java code modifications in Maven projects
+
+## Critical Rules
+
+- Run 'mvn compile' after any code changes to verify compilation
+- Execute 'mvn test' to ensure all tests pass
+- Address any compilation errors before proceeding
+- Fix test failures before considering changes complete
+- Check for and resolve any dependency conflicts
+- Verify clean build with 'mvn clean install'
+- Review test coverage for new code
+- Document any new dependencies added
+
+## Examples
+
+<example>
+// After making changes to UserService.java:
+1. Run mvn compile
+   ✓ [INFO] BUILD SUCCESS
+   
+2. Run mvn test
+   ✓ [INFO] Tests run: 42, Failures: 0, Errors: 0, Skipped: 0
+   ✓ [INFO] BUILD SUCCESS
+   
+3. Proceed with commit
+</example>
+
+<example type="invalid">
+// Making changes without validation:
+1. Edit UserService.java
+2. Commit changes directly
+3. Skip build verification
+4. Push without running tests
+
+// Or ignoring failures:
+1. Run mvn compile
+   × [ERROR] compilation failure
+2. Proceed anyway without fixing errors
+</example> 

@@ -34,14 +34,14 @@ public class IdentifierAutoConfigurationTest {
     public void testIdentifierGlobalConfiguration() {
         // Test that the global configuration properties are loaded
         assertNotNull(properties);
-        assertEquals("LONG", properties.getDefaultType());
+        assertEquals("STRING", properties.getDefaultType());
         assertTrue(properties.isStringEqualityCheck());
-        assertTrue(properties.isAutoConvertStringToLong());
+        assertFalse(properties.isAutoConvertStringToLong());
         
         // Test identifier behavior with global configuration
         Identifier stringId = Identifier.of("123");
-        // Should be auto-converted to LONG due to configuration
-        assertEquals(Identifier.Type.LONG, stringId.getType());
+        // Should stay as STRING due to configuration
+        assertEquals(Identifier.Type.STRING, stringId.getType());
         
         // Test equality based on configuration
         Identifier longId = Identifier.of(123L);

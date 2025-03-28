@@ -15,8 +15,11 @@ public class CustomIdentifierGenerator implements IdentifierGenerator {
     
     @Override
     public Object generate(SharedSessionContractImplementor session, Object object) {
-        if (object instanceof Person person && person.getId() != null) {
-            return person.getId();
+        if (object instanceof Person person) {
+            Identifier existingId = person.getId();
+            if (existingId != null) {
+                return existingId;
+            }
         }
         return Identifier.of(UUID.randomUUID().toString());
     }

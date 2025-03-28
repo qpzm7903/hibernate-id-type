@@ -43,7 +43,7 @@ public class PersonController {
 
     @PostMapping
     public ResponseEntity<Person> createPerson(@RequestBody Person person) {
-        person.setId(null); // Ensure we're creating a new entity
+        // Don't set ID to null, respect the provided ID
         return new ResponseEntity<>(personService.save(person), HttpStatus.CREATED);
     }
     

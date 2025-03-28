@@ -1,0 +1,80 @@
+---
+description: 
+globs: **/*.java
+alwaysApply: false
+---
+
+# Java Development Standards
+
+## Context
+
+- Apply these standards to all Java code generation and modifications
+- Ensures consistent, secure, and maintainable Java codebase
+- Combines Oracle best practices with modern development standards
+
+## Critical Rules
+
+### Code Structure and Naming
+- Use UpperCamelCase for class names, lowerCamelCase for methods/variables
+- Define constants in UPPER_SNAKE_CASE with clear business meaning
+- Avoid abbreviations except for common ones (XML, HTTP, DTO)
+- Keep methods under 50 lines, nesting under 3 levels
+
+### Exception and Resource Management
+- Use try-with-resources for all AutoCloseable resources
+- Include complete stack traces in catch blocks
+- Explicitly declare throws or handle checked exceptions
+- Define connection timeouts as configurable constants
+
+### Documentation and Comments
+- Write complete Javadoc for all public APIs (classes/methods)
+- Include @param, @return, @throws tags where applicable
+- Document thread safety considerations for concurrent code
+- Add inline comments for complex business logic
+
+### Security and Validation
+- Validate all user inputs and API responses
+- Implement length limits to prevent DoS attacks
+- Use Objects.requireNonNull() for parameter validation
+- Wrap nullable returns in Optional with clear documentation
+
+### Performance and Concurrency
+- Use StringBuilder for string concatenations in loops
+- Prefer java.util.concurrent collections for thread safety
+- Document time complexity for data structure operations
+- Use Stream API for large dataset operations
+
+## Examples
+
+<example>
+public final class UserService {
+    private static final int MAX_RETRY_COUNT = 3;
+    
+    /**
+     * Creates a new user in the system.
+     * @param userDto User data transfer object
+     * @return Optional containing the created user
+     * @throws ValidationException if user data is invalid
+     */
+    public Optional<User> createUser(UserDTO userDto) {
+        Objects.requireNonNull(userDto, "UserDTO must not be null");
+        try (Connection conn = dataSource.getConnection()) {
+            // Implementation
+        }
+    }
+}
+</example>
+
+<example type="invalid">
+class userservice {
+    static int x = 3; // Magic number, no clear meaning
+    
+    public User create(UserDTO d) throws Exception { // Generic exception
+        String sql = "";
+        for(Field f : d.getFields()) { // String concatenation in loop
+            sql += "," + f.getName();
+        }
+        return db.query(sql);  // No resource management
+    }
+}
+</example> 

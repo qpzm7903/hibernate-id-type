@@ -3,8 +3,10 @@ package com.example.idtypedemo.config;
 import com.example.idtypedemo.jackson.IdentifierJacksonModule;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration;
+import org.springframework.boot.autoconfigure.jackson.Jackson2ObjectMapperBuilderCustomizer;
 import org.springframework.context.annotation.Bean;
 
 /**
@@ -13,14 +15,22 @@ import org.springframework.context.annotation.Bean;
  */
 @AutoConfiguration
 @ConditionalOnClass(ObjectMapper.class)
+@AutoConfigureAfter(JacksonAutoConfiguration.class)
 public class IdentifierJacksonAutoConfiguration {
 
     /**
      * Registers the IdentifierJacksonModule bean if not already registered.
      */
     @Bean
-    @ConditionalOnMissingBean
     public IdentifierJacksonModule identifierJacksonModule() {
         return new IdentifierJacksonModule();
+    }
+
+    /**
+     * Customizes the Jackson2ObjectMapperBuilder to include our module.
+     */
+    @Bean
+    public Jackson2ObjectMapperBuilderCustomizer identifierCustomizer(IdentifierJacksonModule module) {
+        return builder -> builder.modulesToInstall(module);
     }
 } 
