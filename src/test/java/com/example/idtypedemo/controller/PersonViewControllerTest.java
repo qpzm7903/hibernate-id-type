@@ -1,7 +1,7 @@
 package com.example.idtypedemo.controller;
 
 import com.example.idtypedemo.domain.Identifier;
-import com.example.idtypedemo.domain.entities.Person;
+import com.example.idtypedemo.entity.Person;
 import com.example.idtypedemo.domain.view.PersonView;
 import com.example.idtypedemo.service.PersonService;
 import com.fasterxml.jackson.databind.ObjectMapper;

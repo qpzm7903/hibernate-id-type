@@ -1,7 +1,7 @@
 package com.example.idtypedemo.controller;
 
 import com.example.idtypedemo.domain.Identifier;
-import com.example.idtypedemo.domain.entities.Person;
+import com.example.idtypedemo.entity.Person;
 import com.example.idtypedemo.service.PersonService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -35,11 +35,11 @@ public class PersonController {
         // Try to parse as Long first, otherwise use as String
         try {
             Long longId = Long.parseLong(id);
-            return personService.findById(longId)
+            return personService.findById(Identifier.of(longId))
                     .map(ResponseEntity::ok)
                     .orElse(ResponseEntity.notFound().build());
         } catch (NumberFormatException e) {
-            return personService.findById(id)
+            return personService.findById(Identifier.of(id))
                     .map(ResponseEntity::ok)
                     .orElse(ResponseEntity.notFound().build());
         }
@@ -87,13 +87,15 @@ public class PersonController {
     public ResponseEntity<Void> deletePerson(@PathVariable String id) {
         try {
             Long longId = Long.parseLong(id);
-            if (personService.findById(longId).isPresent()) {
-                personService.deleteById(longId);
+            Identifier longIdentifier = Identifier.of(longId);
+            if (personService.findById(longIdentifier).isPresent()) {
+                personService.deleteById(longIdentifier);
                 return ResponseEntity.noContent().build();
             }
         } catch (NumberFormatException e) {
-            if (personService.findById(id).isPresent()) {
-                personService.deleteById(id);
+            Identifier stringIdentifier = Identifier.of(id);
+            if (personService.findById(stringIdentifier).isPresent()) {
+                personService.deleteById(stringIdentifier);
                 return ResponseEntity.noContent().build();
             }
         }

@@ -1,7 +1,7 @@
 package com.example.idtypedemo.repository;
 
 import com.example.idtypedemo.domain.Identifier;
-import com.example.idtypedemo.domain.entities.Person;
+import com.example.idtypedemo.entity.Person;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;

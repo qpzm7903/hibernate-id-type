@@ -11,6 +11,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.Type;
+import org.hibernate.annotations.GenericGenerator;
+import jakarta.persistence.GeneratedValue;
 
 /**
  * Example entity that uses the Identifier type for its ID field.
@@ -26,7 +28,9 @@ public class Person {
     
     @Id
     @Type(IdentifierType.class)
-    @Column(name = "id", columnDefinition = "${identifier.type.column}")
+    @Column(name = "id")
+    @GeneratedValue(generator = "custom-identifier")
+    @GenericGenerator(name = "custom-identifier", strategy = "com.example.idtypedemo.type.CustomIdentifierGenerator")
     private Identifier id;
     
     @Column(name = "name", nullable = false)

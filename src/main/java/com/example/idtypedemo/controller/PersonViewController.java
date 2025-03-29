@@ -1,6 +1,7 @@
 package com.example.idtypedemo.controller;
 
 import com.example.idtypedemo.domain.view.PersonView;
+import com.example.idtypedemo.entity.Person;
 import com.example.idtypedemo.service.PersonService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -34,7 +35,7 @@ public class PersonViewController {
     public ResponseEntity<PersonView> getExamplePersonView() {
         // Create an example PersonView for documentation/testing
         return ResponseEntity.ok(PersonView.builder()
-                .person(null)
+                .person(Person.builder().name("Example Person").build())
                 .additionalInfo("Example person view")
                 .build());
     }

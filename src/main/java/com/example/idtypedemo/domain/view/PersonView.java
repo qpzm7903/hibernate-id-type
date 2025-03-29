@@ -1,6 +1,6 @@
 package com.example.idtypedemo.domain.view;
 
-import com.example.idtypedemo.domain.entities.Person;
+import com.example.idtypedemo.entity.Person;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

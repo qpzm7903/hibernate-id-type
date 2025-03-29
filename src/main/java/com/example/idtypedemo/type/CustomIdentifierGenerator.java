@@ -1,7 +1,7 @@
 package com.example.idtypedemo.type;
 
 import com.example.idtypedemo.domain.Identifier;
-import com.example.idtypedemo.domain.entities.Person;
+import com.example.idtypedemo.entity.Person;
 import org.hibernate.engine.spi.SharedSessionContractImplementor;
 import org.hibernate.id.IdentifierGenerator;
 
