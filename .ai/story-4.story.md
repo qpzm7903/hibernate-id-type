@@ -1,125 +1,131 @@
 # Epic-1 - Story-4
+# Implement Database Type Mapping for Identifier System
 
-Repository and Service Implementation
-
-**As a** developer
-**I want** to create fully functional repository and service layers using the custom ID type
-**so that** I can demonstrate complete CRUD operations with the Identifier type
+**As a** developer using the Identifier type system
+**I want** the database to automatically use BIGINT for Long IDs and VARCHAR for String IDs
+**so that** data is stored efficiently and correctly in the database based on the configured type
 
 ## Status
 
-Draft
+In Progress
 
 ## Context
 
-This is the fourth and final story in Epic-1 (Custom Identifier Type Implementation). We've already created the basic project setup (Story-1), implemented the custom Identifier type (Story-2), and integrated it with Hibernate (Story-3). Now we need to expand the repository and service implementations to showcase more advanced use cases and test them with different database types.
+The Identifier type system needs to ensure proper database column type mapping based on the configured ID type:
+- When configured for Long IDs, the system must use BIGINT type in the database
+- When configured for String IDs, the system must use VARCHAR type in the database
+- This mapping must work consistently across MySQL, PostgreSQL, and H2 databases
+- The implementation builds upon the Hibernate type integration from Story-3
+- This is a critical feature for data integrity and performance optimization
 
 ## Estimation
 
-Story Points: 2
+Story Points: 2 (2 days of human development = 20 minutes of AI development)
 
 ## Tasks
 
-1. - [ ] Implement advanced repository methods
-   1. - [ ] Add custom query methods with JPQL
-   2. - [ ] Create native query examples
-   3. - [ ] Implement dynamic query builder with Specifications
-2. - [ ] Enhance service layer functionality
-   1. - [ ] Add batch operations
-   2. - [ ] Implement transaction examples
-   3. - [ ] Create conditional operations based on ID type
-3. - [ ] Create integration tests
+1. - [x] Database Type Resolution System
+   1. - [x] Create DatabaseTypeResolver interface and implementation
+   2. - [x] Add configuration properties for ID type selection
+   3. - [x] Implement type mapping logic for each database dialect
+   4. - [x] Write unit tests for type resolution
+
+2. - [ ] Hibernate Integration
+   1. - [ ] Update IdentifierType to use DatabaseTypeResolver
+   2. - [ ] Add dynamic SQL type resolution based on configuration
+   3. - [ ] Implement proper column definition handling
+   4. - [ ] Write integration tests with Hibernate
+
+3. - [ ] Entity Configuration
+   1. - [ ] Update entity annotations for dynamic type handling
+   2. - [ ] Add configuration validation
+   3. - [ ] Create example entities with both ID types
+   4. - [ ] Write entity configuration tests
+
+4. - [ ] Integration Testing
    1. - [ ] Test with H2 database
-   2. - [ ] Test with MySQL (using Docker)
-   3. - [ ] Test with PostgreSQL (using Docker)
-4. - [ ] Document usage and examples
-   1. - [ ] Create usage examples in README
-   2. - [ ] Add Javadoc documentation
-   3. - [ ] Create a simple demo UI
+   2. - [ ] Test with MySQL database
+   3. - [ ] Test with PostgreSQL database
+   4. - [ ] Verify type mapping across all databases
 
 ## Constraints
 
-- Must work with all three database types (H2, MySQL, PostgreSQL)
-- All CRUD operations must handle both Long and String ID types
-- Code must be well-documented and include meaningful test cases
+- Must maintain backward compatibility with existing data
+- Must support H2, MySQL, and PostgreSQL databases
+- Must provide clear error messages for misconfiguration
+- Must handle type conversion edge cases gracefully
+- Must not impact performance significantly
 
 ## Data Models / Schema
 
-### Enhanced Repository Interface
-
 ```java
-@Repository
-public interface PersonRepository extends JpaRepository<Person, Identifier>, JpaSpecificationExecutor<Person> {
-    
-    // Find by name
-    List<Person> findByName(String name);
-    
-    // Find by age greater than
-    @Query("SELECT p FROM Person p WHERE p.age > :age")
-    List<Person> findByAgeGreaterThan(@Param("age") Integer age);
-    
-    // Find by ID type
-    @Query("SELECT p FROM Person p WHERE TYPE(p.id) = :idType")
-    List<Person> findByIdType(@Param("idType") Identifier.Type idType);
-    
-    // Native query example
-    @Query(value = "SELECT * FROM person WHERE CAST(id AS VARCHAR) LIKE :pattern", nativeQuery = true)
-    List<Person> findByIdPattern(@Param("pattern") String pattern);
+// Configuration Properties
+application.properties:
+identifier.type=LONG|STRING
+identifier.string.length=255
+
+// DatabaseTypeResolver Interface
+public interface DatabaseTypeResolver {
+    int resolveSqlType(Identifier.Type type);
+    String getColumnDefinition(Identifier.Type type, String dialect);
 }
-```
 
-### Enhanced Service Interface
-
-```java
-@Service
-public class PersonService {
-    
-    // Existing methods...
-    
-    // Batch save
-    @Transactional
-    public List<Person> saveAll(List<Person> persons);
-    
-    // Find by ID type
-    @Transactional(readOnly = true)
-    public List<Person> findByIdType(Identifier.Type idType);
-    
-    // Find by ID pattern
-    @Transactional(readOnly = true)
-    public List<Person> findByIdPattern(String pattern);
-    
-    // Convert IDs from one type to another
-    @Transactional
-    public void convertIdsToType(Identifier.Type targetType);
+// Example Entity
+@Entity
+public class Person {
+    @Id
+    @Type(IdentifierType.class)
+    @Column(columnDefinition = "${identifier.type.column}")
+    private Identifier id;
+    // ... other fields
 }
 ```
 
 ## Structure
 
-The implementation will extend the existing structure:
-
 ```text
-src/
-└── main/
-    └── java/
-        └── com/example/idtypedemo/
-            ├── repository/
-            │   ├── PersonRepository.java (enhanced)
-            │   └── specification/
-            │       └── PersonSpecifications.java (new)
-            ├── service/
-            │   └── PersonService.java (enhanced)
-            └── controller/
-                └── PersonController.java (enhanced)
+src/main/java/com/example/idtypedemo/
+├── type/
+│   ├── DatabaseTypeResolver.java
+│   └── IdentifierType.java
+├── config/
+│   └── IdentifierTypeConfig.java
+├── entity/
+│   └── Person.java
+└── test/
+    └── type/
+        ├── DatabaseTypeResolverTest.java
+        └── IdentifierTypeIntegrationTest.java
+```
+
+## Diagrams
+
+```mermaid
+sequenceDiagram
+    participant App
+    participant Config
+    participant IdentifierType
+    participant DatabaseTypeResolver
+    participant Database
+    
+    App->>Config: Load ID type configuration
+    Config->>DatabaseTypeResolver: Initialize with configuration
+    App->>IdentifierType: Save entity with Identifier
+    IdentifierType->>DatabaseTypeResolver: Get SQL type for current config
+    DatabaseTypeResolver-->>IdentifierType: Return BIGINT/VARCHAR
+    IdentifierType->>Database: Store with correct column type
+    Database-->>App: Confirmation
 ```
 
 ## Dev Notes
 
-- We'll use Spring Data JPA Specifications to build dynamic queries
-- Native queries will need different implementations for different database dialects
-- Integration tests will use Testcontainers for MySQL and PostgreSQL testing
+- The DatabaseTypeResolver must be thread-safe
+- Consider adding type conversion validation
+- Document configuration options clearly
+- Add proper error handling for misconfiguration
+- Consider future extensibility for other ID types
 
 ## Chat Command Log
 
-- User: Let's implement repository and service methods for the Identifier type
-- AI: I'll start by enhancing the repository and service layers 
+- Initial story creation for database type mapping implementation
+- Task 1 completed: Implemented DatabaseTypeResolver with configuration and tests 

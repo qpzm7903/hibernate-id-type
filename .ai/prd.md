@@ -24,11 +24,19 @@ This project demonstrates how to implement a custom ID type called "Identifier" 
   - Create entity classes that use the `Identifier` type for ID fields
   - Demonstrate CRUD operations with entities using the custom ID type
   - Show how the ID type works with different database dialects (MySQL, PostgreSQL, H2)
+  - **Database Storage Type Requirements:**
+    - When system is configured to use Long ID type:
+      - Must use numeric type (BIGINT) for database storage
+      - Must maintain numeric precision and performance benefits
+    - When system is configured to use String ID type:
+      - Must use text type (VARCHAR) for database storage
+      - Must support full string ID capabilities
 - Non-functional requirements
   - Implement proper `toString()`, `equals()`, and `hashCode()` methods for the `Identifier` class
   - Ensure proper JSON serialization/deserialization using Jackson
   - Implement seamless integration with Spring Data JPA repositories
   - Provide comprehensive documentation on how to use the custom ID type
+  - Ensure type safety and data integrity across different database systems
 
 ## Epic List
 
@@ -67,6 +75,11 @@ This project demonstrates how to implement a custom ID type called "Identifier" 
   - Create repository interfaces using the custom ID type
   - Implement service layer for CRUD operations
   - Test basic operations with the custom ID type
+  - Implement database storage type mapping:
+    - Configure BIGINT type for Long IDs
+    - Configure VARCHAR type for String IDs
+  - Add database migration scripts for type handling
+  - Implement automated tests for type mapping verification
 
 ## Technology Stack
 
@@ -102,14 +115,21 @@ classDiagram
         +returnedClass()
         +nullSafeGet()
         +nullSafeSet()
+        -getSqlType(Type type)
     }
     
     class IdentifierJacksonModule {
         +setupModule()
     }
     
+    class DatabaseTypeResolver {
+        +resolveSqlType(Type type)
+        +getColumnDefinition(Type type)
+    }
+    
     Identifier -- IdentifierType
     IdentifierJacksonModule -- Identifier
+    IdentifierType -- DatabaseTypeResolver
 ```
 
 ## Data Models, API Specs, Schemas, etc...
@@ -129,6 +149,13 @@ public class Identifier implements Serializable {
 }
 ```
 
+### Database Type Mapping
+
+| ID Type | MySQL      | PostgreSQL | H2         |
+|---------|------------|------------|------------|
+| LONG    | BIGINT     | BIGINT     | BIGINT     |
+| STRING  | VARCHAR    | VARCHAR    | VARCHAR    |
+
 ### Entity Example
 
 ```java
@@ -136,6 +163,7 @@ public class Identifier implements Serializable {
 public class Person {
     @Id
     @Type(IdentifierType.class)
+    @Column(columnDefinition = "${identifier.type.column}") // Resolved at runtime
     private Identifier id;
     
     private String name;
