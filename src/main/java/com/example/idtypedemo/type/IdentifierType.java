@@ -1,5 +1,6 @@
 package com.example.idtypedemo.type;
 
+import com.example.idtypedemo.config.ConfigurationLoader;
 import com.example.idtypedemo.config.IdentifierProperties;
 import com.example.idtypedemo.domain.Identifier;
 import jakarta.annotation.PostConstruct;
@@ -8,24 +9,14 @@ import org.hibernate.type.descriptor.jdbc.JdbcType;
 import org.hibernate.usertype.UserType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.core.io.FileSystemResource;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.support.PropertiesLoaderUtils;
 import org.springframework.stereotype.Component;
-import org.springframework.util.ResourceUtils;
 
-import java.io.File;
-import java.io.InputStream;
 import java.io.Serializable;
-import java.net.URL;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
 import java.util.Objects;
-import java.util.Properties;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
@@ -41,23 +32,11 @@ public class IdentifierType implements UserType<Identifier> {
     
     private static final Logger logger = Logger.getLogger(IdentifierType.class.getName());
     
-    // Configuration file paths to try
-    private static final String[] CONFIG_LOCATIONS = {
-            "classpath:application.properties",
-            "classpath:application.yml",
-            "classpath:application-${spring.profiles.active}.properties",
-            "file:./application.properties",
-            "file:./config/application.properties"
-    };
-    
     // Default values for configuration
     private static final String DEFAULT_ID_TYPE = "LONG";
     private static final boolean DEFAULT_USE_NATIVE_TYPES = true;
     private static final boolean DEFAULT_STRING_EQUALITY_CHECK = true;
     private static final boolean DEFAULT_AUTO_CONVERT = true;
-    
-    // Properties loaded directly from file
-    private static Properties directProperties;
     
     // Lazy-initialized dependencies
     private DatabaseTypeResolver databaseTypeResolver;
@@ -75,8 +54,6 @@ public class IdentifierType implements UserType<Identifier> {
      */
     public IdentifierType() {
         logger.fine("IdentifierType instantiated via no-args constructor");
-        // Ensure properties are loaded
-        loadPropertiesIfNeeded();
     }
 
     /**
@@ -87,9 +64,6 @@ public class IdentifierType implements UserType<Identifier> {
         logger.fine("IdentifierType instantiated via Spring DI constructor");
         this.databaseTypeResolver = Objects.requireNonNull(databaseTypeResolver, "DatabaseTypeResolver must not be null");
         this.identifierProperties = Objects.requireNonNull(identifierProperties, "IdentifierProperties must not be null");
-        
-        // Ensure properties are loaded for static access
-        loadPropertiesIfNeeded();
     }
     
     /**
@@ -101,119 +75,6 @@ public class IdentifierType implements UserType<Identifier> {
         // Ensure dependencies are initialized
         getDatabaseTypeResolver();
         getIdentifierProperties();
-    }
-    
-    /**
-     * Loads properties from various configuration files if they haven't been loaded already.
-     * This method attempts to load properties from multiple locations to ensure
-     * they are available in different deployment scenarios.
-     */
-    private static synchronized void loadPropertiesIfNeeded() {
-        if (directProperties != null) {
-            return; // Already loaded
-        }
-        
-        directProperties = new Properties();
-        boolean loaded = false;
-        
-        // Try all configuration locations
-        for (String configLocation : CONFIG_LOCATIONS) {
-            try {
-                // Replace profile placeholder if present
-                String location = configLocation;
-                if (location.contains("${spring.profiles.active}")) {
-                    String profile = System.getProperty("spring.profiles.active", "");
-                    if (profile.isEmpty()) {
-                        profile = System.getenv("SPRING_PROFILES_ACTIVE");
-                        if (profile == null) profile = "";
-                    }
-                    if (!profile.isEmpty()) {
-                        location = location.replace("${spring.profiles.active}", profile);
-                    } else {
-                        continue; // Skip this location if no profile is active
-                    }
-                }
-                
-                Resource resource = null;
-                
-                // Try different ways to load the resource
-                try {
-                    // First try as classpath resource
-                    if (location.startsWith("classpath:")) {
-                        String path = location.substring("classpath:".length());
-                        resource = new ClassPathResource(path);
-                    }
-                    // Then try as file system resource
-                    else if (location.startsWith("file:")) {
-                        String path = location.substring("file:".length());
-                        resource = new FileSystemResource(path);
-                    }
-                    
-                    // If resource is not found or not readable, try using ResourceUtils
-                    if (resource == null || !resource.exists()) {
-                        URL url = ResourceUtils.getURL(location);
-                        if (url != null) {
-                            resource = new FileSystemResource(new File(url.getPath()));
-                        }
-                    }
-                    
-                    // If still not found, try a direct classpath lookup
-                    if (resource == null || !resource.exists()) {
-                        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-                        if (classLoader == null) {
-                            classLoader = IdentifierType.class.getClassLoader();
-                        }
-                        
-                        String simplePath = location;
-                        if (simplePath.startsWith("classpath:")) {
-                            simplePath = simplePath.substring("classpath:".length());
-                        } else if (simplePath.startsWith("file:")) {
-                            simplePath = simplePath.substring("file:".length());
-                        }
-                        
-                        InputStream is = classLoader.getResourceAsStream(simplePath);
-                        if (is != null) {
-                            Properties props = new Properties();
-                            props.load(is);
-                            is.close();
-                            directProperties.putAll(props);
-                            loaded = true;
-                            logger.fine("Loaded properties from " + location + " using classloader");
-                        }
-                    }
-                    
-                    // If resource is found and readable, load it
-                    if (resource != null && resource.exists()) {
-                        Properties props = PropertiesLoaderUtils.loadProperties(resource);
-                        directProperties.putAll(props);
-                        loaded = true;
-                        logger.fine("Loaded properties from " + location);
-                    }
-                } catch (Exception e) {
-                    logger.log(Level.FINE, "Could not load properties from " + location, e);
-                }
-            } catch (Exception e) {
-                logger.log(Level.FINE, "Error loading properties from " + configLocation, e);
-            }
-        }
-        
-        if (!loaded) {
-            logger.warning("Could not load any properties files. Using default values.");
-        }
-    }
-    
-    /**
-     * Gets a property value from the directly loaded properties.
-     * 
-     * @param key the property key
-     * @param defaultValue the default value if the property is not found
-     * @return the property value or the default value
-     */
-    private static String getDirectProperty(String key, String defaultValue) {
-        if (directProperties == null) {
-            loadPropertiesIfNeeded();
-        }
-        return directProperties.getProperty(key, defaultValue);
     }
     
     /**
@@ -235,12 +96,12 @@ public class IdentifierType implements UserType<Identifier> {
             logger.fine("Creating IdentifierProperties from properties");
             IdentifierProperties defaultProps = new IdentifierProperties();
             
-            // Load values from the directly loaded properties
-            String defaultType = getDirectProperty("identifier.type", DEFAULT_ID_TYPE);
-            boolean stringEqualityCheck = Boolean.parseBoolean(
-                    getDirectProperty("identifier.string.equality.check", String.valueOf(DEFAULT_STRING_EQUALITY_CHECK)));
-            boolean autoConvert = Boolean.parseBoolean(
-                    getDirectProperty("identifier.auto.convert.string.to.long", String.valueOf(DEFAULT_AUTO_CONVERT)));
+            // Load values from the configuration loader
+            String defaultType = ConfigurationLoader.getProperty("identifier.type", DEFAULT_ID_TYPE);
+            boolean stringEqualityCheck = ConfigurationLoader.getBooleanProperty(
+                    "identifier.string.equality.check", DEFAULT_STRING_EQUALITY_CHECK);
+            boolean autoConvert = ConfigurationLoader.getBooleanProperty(
+                    "identifier.auto.convert.string.to.long", DEFAULT_AUTO_CONVERT);
             
             defaultProps.setDefaultType(defaultType);
             defaultProps.setStringEqualityCheck(stringEqualityCheck);
@@ -261,10 +122,9 @@ public class IdentifierType implements UserType<Identifier> {
      */
     private boolean isUseNativeTypes() {
         // If Spring has not injected a value (i.e., it's still the default),
-        // try to get it from directly loaded properties
+        // try to get it from configuration loader
         if (this.useNativeTypes == DEFAULT_USE_NATIVE_TYPES) {
-            return Boolean.parseBoolean(
-                    getDirectProperty("identifier.use.native.types", String.valueOf(DEFAULT_USE_NATIVE_TYPES)));
+            return ConfigurationLoader.getBooleanProperty("identifier.use.native.types", DEFAULT_USE_NATIVE_TYPES);
         }
         return this.useNativeTypes;
     }
@@ -274,10 +134,10 @@ public class IdentifierType implements UserType<Identifier> {
      * Tries to use the value injected by Spring, otherwise falls back to direct properties or environment.
      */
     private String getDialect() {
-        // If Spring has not injected a value, try to get it from directly loaded properties
+        // If Spring has not injected a value, try to get it from configuration loader
         if (this.hibernateDialect == null || this.hibernateDialect.isEmpty()) {
             // Try properties files
-            String dialect = getDirectProperty("hibernate.dialect", "");
+            String dialect = ConfigurationLoader.getProperty("hibernate.dialect", "");
             
             // Try system properties
             if (dialect.isEmpty()) {
