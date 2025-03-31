@@ -3,9 +3,7 @@ package com.example.idtypedemo.type;
 import com.example.idtypedemo.config.ConfigurationLoader;
 import com.example.idtypedemo.config.IdentifierProperties;
 import com.example.idtypedemo.domain.Identifier;
-import jakarta.annotation.PostConstruct;
 import org.hibernate.engine.spi.SharedSessionContractImplementor;
-import org.hibernate.type.descriptor.jdbc.JdbcType;
 import org.hibernate.usertype.UserType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -44,9 +42,6 @@ public class IdentifierType implements UserType<Identifier> {
     
     @Value("${identifier.use.native.types:true}")
     private boolean useNativeTypes = true;
-    
-    @Value("${hibernate.dialect:}")
-    private String hibernateDialect;
 
     /**
      * No-args constructor required by Hibernate for direct instantiation.
@@ -65,18 +60,7 @@ public class IdentifierType implements UserType<Identifier> {
         this.databaseTypeResolver = Objects.requireNonNull(databaseTypeResolver, "DatabaseTypeResolver must not be null");
         this.identifierProperties = Objects.requireNonNull(identifierProperties, "IdentifierProperties must not be null");
     }
-    
-    /**
-     * Initialize dependencies after construction.
-     */
-    @PostConstruct
-    public void init() {
-        logger.fine("IdentifierType @PostConstruct initialization");
-        // Ensure dependencies are initialized
-        getDatabaseTypeResolver();
-        getIdentifierProperties();
-    }
-    
+
     /**
      * Gets database type resolver, creating a default one if needed.
      */
@@ -127,31 +111,6 @@ public class IdentifierType implements UserType<Identifier> {
             return ConfigurationLoader.getBooleanProperty("identifier.use.native.types", DEFAULT_USE_NATIVE_TYPES);
         }
         return this.useNativeTypes;
-    }
-    
-    /**
-     * Gets the Hibernate dialect.
-     * Tries to use the value injected by Spring, otherwise falls back to direct properties or environment.
-     */
-    private String getDialect() {
-        // If Spring has not injected a value, try to get it from configuration loader
-        if (this.hibernateDialect == null || this.hibernateDialect.isEmpty()) {
-            // Try properties files
-            String dialect = ConfigurationLoader.getProperty("hibernate.dialect", "");
-            
-            // Try system properties
-            if (dialect.isEmpty()) {
-                dialect = System.getProperty("hibernate.dialect", "");
-            }
-            
-            // Try environment variables
-            if (dialect.isEmpty()) {
-                dialect = System.getenv("HIBERNATE_DIALECT");
-            }
-            
-            return dialect;
-        }
-        return this.hibernateDialect;
     }
 
     @Override
@@ -271,16 +230,6 @@ public class IdentifierType implements UserType<Identifier> {
         return original; // Identifier is immutable
     }
 
-    /**
-     * Get the column definition based on the configured ID type and dialect.
-     * This can be used in @Column annotations.
-     */
-    public String getColumnDefinition() {
-        String dialect = getDialect();
-        Identifier.Type type = Identifier.Type.valueOf(getIdentifierProperties().getDefaultType().toUpperCase());
-        return getDatabaseTypeResolver().getColumnDefinition(type, dialect);
-    }
-    
     /**
      * Check if the system is configured to use Long IDs
      */

@@ -1,6 +1,7 @@
 package com.example.idtypedemo.type;
 
 import java.sql.Types;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import com.example.idtypedemo.domain.Identifier;
@@ -13,14 +14,14 @@ import com.example.idtypedemo.domain.Identifier;
 public class DefaultDatabaseTypeResolver implements DatabaseTypeResolver {
 
     @Value("${identifier.string.length:255}")
-    private int stringLength;
+    private int stringLength = 255;
 
     @Override
     public int resolveSqlType(Identifier.Type type) {
         if (type == null) {
             throw new IllegalArgumentException("Identifier type cannot be null");
         }
-        
+
         return switch (type) {
             case LONG -> Types.BIGINT;
             case STRING -> Types.VARCHAR;
@@ -45,17 +46,14 @@ public class DefaultDatabaseTypeResolver implements DatabaseTypeResolver {
     private String getNumericColumnDefinition(String dialect) {
         return switch (dialect.toLowerCase()) {
             case "mysql", "h2", "postgresql" -> "BIGINT";
-            default -> throw new UnsupportedOperationException(
-                "Unsupported database dialect: " + dialect);
+            default -> throw new UnsupportedOperationException("Unsupported database dialect: " + dialect);
         };
     }
 
     private String getStringColumnDefinition(String dialect) {
         return switch (dialect.toLowerCase()) {
-            case "mysql", "h2", "postgresql" -> 
-                String.format("VARCHAR(%d)", stringLength);
-            default -> throw new UnsupportedOperationException(
-                "Unsupported database dialect: " + dialect);
+            case "mysql", "h2", "postgresql" -> String.format("VARCHAR(%d)", stringLength);
+            default -> throw new UnsupportedOperationException("Unsupported database dialect: " + dialect);
         };
     }
 } 
