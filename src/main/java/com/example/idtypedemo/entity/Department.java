@@ -6,9 +6,10 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.FetchType;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.CascadeType;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,16 +19,16 @@ import org.hibernate.annotations.GenericGenerator;
 import jakarta.persistence.GeneratedValue;
 
 /**
- * Example entity that uses the Identifier type for its ID field.
- * The column definition is resolved at runtime based on configuration.
+ * Department entity representing a department within the organization.
+ * Each department can have multiple people associated with it.
  */
 @Entity
-@Table(name = "person")
+@Table(name = "department")
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class Person {
+public class Department {
     
     @Id
     @Type(IdentifierType.class)
@@ -39,13 +40,10 @@ public class Person {
     @Column(name = "name", nullable = false)
     private String name;
     
-    @Column(name = "email")
-    private String email;
+    @Column(name = "description")
+    private String description;
     
-    @Column(name = "age")
-    private Integer age;
-    
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "department_id")
-    private Department department;
+    @Builder.Default
+    @OneToMany(mappedBy = "department", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Person> people = new ArrayList<>();
 } 
