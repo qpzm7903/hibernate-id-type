@@ -13,14 +13,24 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.support.PropertiesLoaderUtils;
 import org.springframework.stereotype.Component;
+import org.springframework.util.ResourceUtils;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.Serializable;
+import java.net.URL;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
 import java.util.Objects;
+import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -31,11 +41,31 @@ import java.util.logging.Logger;
  * <p>
  * This implementation is designed to handle Hibernate's direct instantiation process
  * and work properly even when Spring's dependency injection is bypassed.
+ * It can also load configuration directly from property files for maximum compatibility
+ * across different deployment scenarios.
  */
 @Component
 public class IdentifierType implements UserType<Identifier>, ApplicationContextAware, BeanFactoryAware {
     
     private static final Logger logger = Logger.getLogger(IdentifierType.class.getName());
+    
+    // Configuration file paths to try
+    private static final String[] CONFIG_LOCATIONS = {
+            "classpath:application.properties",
+            "classpath:application.yml",
+            "classpath:application-${spring.profiles.active}.properties",
+            "file:./application.properties",
+            "file:./config/application.properties"
+    };
+    
+    // Default values for configuration
+    private static final String DEFAULT_ID_TYPE = "LONG";
+    private static final boolean DEFAULT_USE_NATIVE_TYPES = true;
+    private static final boolean DEFAULT_STRING_EQUALITY_CHECK = true;
+    private static final boolean DEFAULT_AUTO_CONVERT = true;
+    
+    // Properties loaded directly from file
+    private static Properties directProperties;
     
     // Static references to Spring containers for access in no-args constructor and direct Hibernate instantiation
     private static ApplicationContext applicationContext;
@@ -58,6 +88,8 @@ public class IdentifierType implements UserType<Identifier>, ApplicationContextA
     public IdentifierType() {
         logger.fine("IdentifierType instantiated via no-args constructor");
         // Dependencies will be initialized lazily through getter methods
+        // Ensure properties are loaded
+        loadPropertiesIfNeeded();
     }
 
     /**
@@ -68,6 +100,9 @@ public class IdentifierType implements UserType<Identifier>, ApplicationContextA
         logger.fine("IdentifierType instantiated via Spring DI constructor");
         this.databaseTypeResolver = Objects.requireNonNull(databaseTypeResolver, "DatabaseTypeResolver must not be null");
         this.identifierProperties = Objects.requireNonNull(identifierProperties, "IdentifierProperties must not be null");
+        
+        // Ensure properties are loaded for static access
+        loadPropertiesIfNeeded();
     }
     
     /**
@@ -112,6 +147,119 @@ public class IdentifierType implements UserType<Identifier>, ApplicationContextA
     public void setBeanFactory(BeanFactory factory) throws BeansException {
         logger.fine("Setting static BeanFactory reference in IdentifierType");
         IdentifierType.beanFactory = factory;
+    }
+    
+    /**
+     * Loads properties from various configuration files if they haven't been loaded already.
+     * This method attempts to load properties from multiple locations to ensure
+     * they are available in different deployment scenarios.
+     */
+    private static synchronized void loadPropertiesIfNeeded() {
+        if (directProperties != null) {
+            return; // Already loaded
+        }
+        
+        directProperties = new Properties();
+        boolean loaded = false;
+        
+        // Try all configuration locations
+        for (String configLocation : CONFIG_LOCATIONS) {
+            try {
+                // Replace profile placeholder if present
+                String location = configLocation;
+                if (location.contains("${spring.profiles.active}")) {
+                    String profile = System.getProperty("spring.profiles.active", "");
+                    if (profile.isEmpty()) {
+                        profile = System.getenv("SPRING_PROFILES_ACTIVE");
+                        if (profile == null) profile = "";
+                    }
+                    if (!profile.isEmpty()) {
+                        location = location.replace("${spring.profiles.active}", profile);
+                    } else {
+                        continue; // Skip this location if no profile is active
+                    }
+                }
+                
+                Resource resource = null;
+                
+                // Try different ways to load the resource
+                try {
+                    // First try as classpath resource
+                    if (location.startsWith("classpath:")) {
+                        String path = location.substring("classpath:".length());
+                        resource = new ClassPathResource(path);
+                    }
+                    // Then try as file system resource
+                    else if (location.startsWith("file:")) {
+                        String path = location.substring("file:".length());
+                        resource = new FileSystemResource(path);
+                    }
+                    
+                    // If resource is not found or not readable, try using ResourceUtils
+                    if (resource == null || !resource.exists()) {
+                        URL url = ResourceUtils.getURL(location);
+                        if (url != null) {
+                            resource = new FileSystemResource(new File(url.getPath()));
+                        }
+                    }
+                    
+                    // If still not found, try a direct classpath lookup
+                    if (resource == null || !resource.exists()) {
+                        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+                        if (classLoader == null) {
+                            classLoader = IdentifierType.class.getClassLoader();
+                        }
+                        
+                        String simplePath = location;
+                        if (simplePath.startsWith("classpath:")) {
+                            simplePath = simplePath.substring("classpath:".length());
+                        } else if (simplePath.startsWith("file:")) {
+                            simplePath = simplePath.substring("file:".length());
+                        }
+                        
+                        InputStream is = classLoader.getResourceAsStream(simplePath);
+                        if (is != null) {
+                            Properties props = new Properties();
+                            props.load(is);
+                            is.close();
+                            directProperties.putAll(props);
+                            loaded = true;
+                            logger.fine("Loaded properties from " + location + " using classloader");
+                        }
+                    }
+                    
+                    // If resource is found and readable, load it
+                    if (resource != null && resource.exists()) {
+                        Properties props = PropertiesLoaderUtils.loadProperties(resource);
+                        directProperties.putAll(props);
+                        loaded = true;
+                        logger.fine("Loaded properties from " + location);
+                    }
+                } catch (Exception e) {
+                    logger.log(Level.FINE, "Could not load properties from " + location, e);
+                }
+            } catch (Exception e) {
+                logger.log(Level.FINE, "Error loading properties from " + configLocation, e);
+            }
+        }
+        
+        if (!loaded) {
+            logger.warning("Could not load any properties files. Using default values.");
+        }
+    }
+    
+    /**
+     * Gets a property value from the directly loaded properties.
+     * 
+     * @param key the property key
+     * @param defaultValue the default value if the property is not found
+     * @return the property value or the default value
+     */
+    private static String getDirectProperty(String key, String defaultValue) {
+        if (directProperties == null) {
+            loadPropertiesIfNeeded();
+        }
+        return directProperties.getProperty(key, defaultValue);
     }
     
     /**
@@ -180,21 +328,72 @@ public class IdentifierType implements UserType<Identifier>, ApplicationContextA
                 }
             }
             
-            // 3. Fallback to default implementation
-            logger.fine("Creating default IdentifierProperties as fallback");
+            // 3. Fallback to directly configured properties
+            logger.fine("Creating IdentifierProperties from direct properties");
             IdentifierProperties defaultProps = new IdentifierProperties();
-            defaultProps.setDefaultType("LONG");
-            defaultProps.setStringEqualityCheck(true);
-            defaultProps.setAutoConvertStringToLong(true);
+            
+            // Load values from the directly loaded properties
+            String defaultType = getDirectProperty("identifier.type", DEFAULT_ID_TYPE);
+            boolean stringEqualityCheck = Boolean.parseBoolean(
+                    getDirectProperty("identifier.string.equality.check", String.valueOf(DEFAULT_STRING_EQUALITY_CHECK)));
+            boolean autoConvert = Boolean.parseBoolean(
+                    getDirectProperty("identifier.auto.convert.string.to.long", String.valueOf(DEFAULT_AUTO_CONVERT)));
+            
+            defaultProps.setDefaultType(defaultType);
+            defaultProps.setStringEqualityCheck(stringEqualityCheck);
+            defaultProps.setAutoConvertStringToLong(autoConvert);
             identifierProperties = defaultProps;
+            
+            logger.fine("Created default IdentifierProperties with type=" + defaultType + 
+                         ", stringEqualityCheck=" + stringEqualityCheck + 
+                         ", autoConvert=" + autoConvert);
         }
         
         return identifierProperties;
     }
 
+    /**
+     * Gets the value of useNativeTypes property.
+     * Tries to use the value injected by Spring, otherwise falls back to direct properties.
+     */
+    private boolean isUseNativeTypes() {
+        // If Spring has not injected a value (i.e., it's still the default),
+        // try to get it from directly loaded properties
+        if (this.useNativeTypes == DEFAULT_USE_NATIVE_TYPES) {
+            return Boolean.parseBoolean(
+                    getDirectProperty("identifier.use.native.types", String.valueOf(DEFAULT_USE_NATIVE_TYPES)));
+        }
+        return this.useNativeTypes;
+    }
+    
+    /**
+     * Gets the Hibernate dialect.
+     * Tries to use the value injected by Spring, otherwise falls back to direct properties or environment.
+     */
+    private String getDialect() {
+        // If Spring has not injected a value, try to get it from directly loaded properties
+        if (this.hibernateDialect == null || this.hibernateDialect.isEmpty()) {
+            // Try properties files
+            String dialect = getDirectProperty("hibernate.dialect", "");
+            
+            // Try system properties
+            if (dialect.isEmpty()) {
+                dialect = System.getProperty("hibernate.dialect", "");
+            }
+            
+            // Try environment variables
+            if (dialect.isEmpty()) {
+                dialect = System.getenv("HIBERNATE_DIALECT");
+            }
+            
+            return dialect;
+        }
+        return this.hibernateDialect;
+    }
+
     @Override
     public int getSqlType() {
-        if (useNativeTypes) {
+        if (isUseNativeTypes()) {
             Identifier.Type idType = Identifier.Type.valueOf(getIdentifierProperties().getDefaultType().toUpperCase());
             return getDatabaseTypeResolver().resolveSqlType(idType);
         }
@@ -222,7 +421,7 @@ public class IdentifierType implements UserType<Identifier>, ApplicationContextA
             throws SQLException {
         
         // For Long-configured system, try to read as BIGINT first
-        if (isLongTypeSystem() && useNativeTypes) {
+        if (isLongTypeSystem() && isUseNativeTypes()) {
             Long longValue = rs.getLong(position);
             if (!rs.wasNull()) {
                 return Identifier.of(longValue);
@@ -256,11 +455,11 @@ public class IdentifierType implements UserType<Identifier>, ApplicationContextA
         }
         
         // For Long-configured system with native types, use direct BIGINT for Long values
-        if (isLongTypeSystem() && useNativeTypes && value.isLong()) {
+        if (isLongTypeSystem() && isUseNativeTypes() && value.isLong()) {
             st.setLong(index, value.asLong());
         } 
         // For String-configured system with native types, use direct VARCHAR for String values
-        else if (isStringTypeSystem() && useNativeTypes && value.isString()) {
+        else if (isStringTypeSystem() && isUseNativeTypes() && value.isString()) {
             st.setString(index, value.asString());
         }
         // Otherwise, use simple string representation
@@ -314,7 +513,7 @@ public class IdentifierType implements UserType<Identifier>, ApplicationContextA
      * This can be used in @Column annotations.
      */
     public String getColumnDefinition() {
-        String dialect = hibernateDialect;
+        String dialect = getDialect();
         Identifier.Type type = Identifier.Type.valueOf(getIdentifierProperties().getDefaultType().toUpperCase());
         return getDatabaseTypeResolver().getColumnDefinition(type, dialect);
     }
@@ -331,27 +530,5 @@ public class IdentifierType implements UserType<Identifier>, ApplicationContextA
      */
     private boolean isStringTypeSystem() {
         return getIdentifierProperties() != null && "STRING".equalsIgnoreCase(getIdentifierProperties().getDefaultType());
-    }
-    
-    /**
-     * Get the current Hibernate dialect
-     */
-    private static String getCurrentDialect() {
-        // Extract dialect name from full class name
-        String fullDialect = System.getProperty("hibernate.dialect");
-        if (fullDialect == null || fullDialect.isEmpty()) {
-            return "h2"; // Default to H2
-        }
-        
-        String dialectLower = fullDialect.toLowerCase();
-        if (dialectLower.contains("mysql")) {
-            return "mysql";
-        } else if (dialectLower.contains("postgresql")) {
-            return "postgresql";
-        } else if (dialectLower.contains("h2")) {
-            return "h2";
-        }
-        
-        return "h2"; // Default to H2
     }
 } 

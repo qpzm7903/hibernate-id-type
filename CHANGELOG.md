@@ -1,5 +1,25 @@
 # Changelog
 
+## 2025-03-31: 增强IdentifierType的配置加载能力
+
+### 变更
+
+- 增强了`IdentifierType`类，使其能够从不同的配置源直接加载配置，包括：
+  - 类路径下的application.properties
+  - 文件系统中的application.properties
+  - 支持在各种不同的部署场景下正常工作（如java -jar, java -cp等）
+
+### 原因
+
+- 解决在某些部署环境下无法通过Spring容器访问配置的问题
+- 确保`IdentifierType`在Hibernate直接实例化时能够正常工作
+- 提高代码的健壮性，使其在各种环境下都能可靠运行
+
+### 影响
+
+- 所有测试用例继续通过
+- 提高了应用程序在各种部署环境下的可靠性
+
 ## 2025-03-31: Fix Hibernate Direct Instantiation Issue
 
 ### Summary
