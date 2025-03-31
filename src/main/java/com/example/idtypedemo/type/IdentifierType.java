@@ -2,10 +2,13 @@ package com.example.idtypedemo.type;
 
 import com.example.idtypedemo.config.IdentifierProperties;
 import com.example.idtypedemo.domain.Identifier;
+import jakarta.annotation.PostConstruct;
 import org.hibernate.engine.spi.SharedSessionContractImplementor;
 import org.hibernate.type.descriptor.jdbc.JdbcType;
 import org.hibernate.usertype.UserType;
 import org.springframework.beans.BeansException;
+import org.springframework.beans.factory.BeanFactory;
+import org.springframework.beans.factory.BeanFactoryAware;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
@@ -18,18 +21,27 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
 import java.util.Objects;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Custom Hibernate type for the Identifier class.
  * Maps the Identifier to the appropriate database column type (BIGINT or VARCHAR)
  * based on configuration settings.
+ * <p>
+ * This implementation is designed to handle Hibernate's direct instantiation process
+ * and work properly even when Spring's dependency injection is bypassed.
  */
 @Component
-public class IdentifierType implements UserType<Identifier>, ApplicationContextAware {
+public class IdentifierType implements UserType<Identifier>, ApplicationContextAware, BeanFactoryAware {
     
-    // Static reference to application context for access in no-args constructor
+    private static final Logger logger = Logger.getLogger(IdentifierType.class.getName());
+    
+    // Static references to Spring containers for access in no-args constructor and direct Hibernate instantiation
     private static ApplicationContext applicationContext;
+    private static BeanFactory beanFactory;
     
+    // Lazy-initialized dependencies
     private DatabaseTypeResolver databaseTypeResolver;
     private IdentifierProperties identifierProperties;
     
@@ -41,34 +53,98 @@ public class IdentifierType implements UserType<Identifier>, ApplicationContextA
 
     /**
      * No-args constructor required by Hibernate for direct instantiation.
-     * Dependencies will be lazily loaded from application context.
+     * Dependencies will be lazily loaded from various sources.
      */
     public IdentifierType() {
-        // Will be initialized lazily through getDatabaseTypeResolver() and getIdentifierProperties()
+        logger.fine("IdentifierType instantiated via no-args constructor");
+        // Dependencies will be initialized lazily through getter methods
     }
 
+    /**
+     * Spring-managed constructor with injected dependencies.
+     */
     @Autowired
     public IdentifierType(DatabaseTypeResolver databaseTypeResolver, IdentifierProperties identifierProperties) {
+        logger.fine("IdentifierType instantiated via Spring DI constructor");
         this.databaseTypeResolver = Objects.requireNonNull(databaseTypeResolver, "DatabaseTypeResolver must not be null");
         this.identifierProperties = Objects.requireNonNull(identifierProperties, "IdentifierProperties must not be null");
     }
     
+    /**
+     * Initialize dependencies after construction when in a Spring context.
+     */
+    @PostConstruct
+    public void init() {
+        logger.fine("IdentifierType @PostConstruct initialization");
+        // Ensure dependencies are initialized
+        getDatabaseTypeResolver();
+        getIdentifierProperties();
+    }
+    
     @Override
-    public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
-        // Store static reference to application context
-        IdentifierType.applicationContext = applicationContext;
+    public void setApplicationContext(ApplicationContext context) throws BeansException {
+        logger.fine("Setting static ApplicationContext reference in IdentifierType");
+        IdentifierType.applicationContext = context;
+        
+        // Try to eagerly initialize dependencies if not already set
+        if (this.databaseTypeResolver == null) {
+            try {
+                this.databaseTypeResolver = context.getBean(DatabaseTypeResolver.class);
+                logger.fine("Initialized DatabaseTypeResolver from ApplicationContext");
+            } catch (BeansException e) {
+                logger.fine("Failed to get DatabaseTypeResolver from ApplicationContext: " + e.getMessage());
+                // Will be handled by lazy initialization
+            }
+        }
+        
+        if (this.identifierProperties == null) {
+            try {
+                this.identifierProperties = context.getBean(IdentifierProperties.class);
+                logger.fine("Initialized IdentifierProperties from ApplicationContext");
+            } catch (BeansException e) {
+                logger.fine("Failed to get IdentifierProperties from ApplicationContext: " + e.getMessage());
+                // Will be handled by lazy initialization
+            }
+        }
+    }
+    
+    @Override
+    public void setBeanFactory(BeanFactory factory) throws BeansException {
+        logger.fine("Setting static BeanFactory reference in IdentifierType");
+        IdentifierType.beanFactory = factory;
     }
     
     /**
-     * Lazy getter for database type resolver
+     * Enhanced lazy getter for database type resolver with multiple fallback strategies.
      */
     private DatabaseTypeResolver getDatabaseTypeResolver() {
-        if (databaseTypeResolver == null && applicationContext != null) {
-            databaseTypeResolver = applicationContext.getBean(DatabaseTypeResolver.class);
-        }
-        
         if (databaseTypeResolver == null) {
-            // Fallback to default implementation if application context not available
+            // Try multiple ways to get the dependency
+            
+            // 1. Try instance ApplicationContext
+            if (applicationContext != null) {
+                try {
+                    databaseTypeResolver = applicationContext.getBean(DatabaseTypeResolver.class);
+                    logger.fine("Got DatabaseTypeResolver from static ApplicationContext");
+                    return databaseTypeResolver;
+                } catch (BeansException e) {
+                    logger.fine("Failed to get DatabaseTypeResolver from ApplicationContext");
+                }
+            }
+            
+            // 2. Try instance BeanFactory
+            if (beanFactory != null) {
+                try {
+                    databaseTypeResolver = beanFactory.getBean(DatabaseTypeResolver.class);
+                    logger.fine("Got DatabaseTypeResolver from static BeanFactory");
+                    return databaseTypeResolver;
+                } catch (BeansException e) {
+                    logger.fine("Failed to get DatabaseTypeResolver from BeanFactory");
+                }
+            }
+            
+            // 3. Fallback to default implementation
+            logger.fine("Creating default DatabaseTypeResolver as fallback");
             databaseTypeResolver = new DefaultDatabaseTypeResolver();
         }
         
@@ -76,15 +152,36 @@ public class IdentifierType implements UserType<Identifier>, ApplicationContextA
     }
     
     /**
-     * Lazy getter for identifier properties
+     * Enhanced lazy getter for identifier properties with multiple fallback strategies.
      */
     private IdentifierProperties getIdentifierProperties() {
-        if (identifierProperties == null && applicationContext != null) {
-            identifierProperties = applicationContext.getBean(IdentifierProperties.class);
-        }
-        
         if (identifierProperties == null) {
-            // Fallback to default settings if application context not available
+            // Try multiple ways to get the dependency
+            
+            // 1. Try instance ApplicationContext
+            if (applicationContext != null) {
+                try {
+                    identifierProperties = applicationContext.getBean(IdentifierProperties.class);
+                    logger.fine("Got IdentifierProperties from static ApplicationContext");
+                    return identifierProperties;
+                } catch (BeansException e) {
+                    logger.fine("Failed to get IdentifierProperties from ApplicationContext");
+                }
+            }
+            
+            // 2. Try instance BeanFactory
+            if (beanFactory != null) {
+                try {
+                    identifierProperties = beanFactory.getBean(IdentifierProperties.class);
+                    logger.fine("Got IdentifierProperties from static BeanFactory");
+                    return identifierProperties;
+                } catch (BeansException e) {
+                    logger.fine("Failed to get IdentifierProperties from BeanFactory");
+                }
+            }
+            
+            // 3. Fallback to default implementation
+            logger.fine("Creating default IdentifierProperties as fallback");
             IdentifierProperties defaultProps = new IdentifierProperties();
             defaultProps.setDefaultType("LONG");
             defaultProps.setStringEqualityCheck(true);
