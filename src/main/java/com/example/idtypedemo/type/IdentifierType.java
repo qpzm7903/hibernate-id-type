@@ -5,8 +5,11 @@ import com.example.idtypedemo.domain.Identifier;
 import org.hibernate.engine.spi.SharedSessionContractImplementor;
 import org.hibernate.type.descriptor.jdbc.JdbcType;
 import org.hibernate.usertype.UserType;
+import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationContextAware;
 import org.springframework.stereotype.Component;
 
 import java.io.Serializable;
@@ -22,10 +25,13 @@ import java.util.Objects;
  * based on configuration settings.
  */
 @Component
-public class IdentifierType implements UserType<Identifier> {
+public class IdentifierType implements UserType<Identifier>, ApplicationContextAware {
     
-    private final DatabaseTypeResolver databaseTypeResolver;
-    private final IdentifierProperties identifierProperties;
+    // Static reference to application context for access in no-args constructor
+    private static ApplicationContext applicationContext;
+    
+    private DatabaseTypeResolver databaseTypeResolver;
+    private IdentifierProperties identifierProperties;
     
     @Value("${identifier.use.native.types:true}")
     private boolean useNativeTypes = true;
@@ -33,17 +39,67 @@ public class IdentifierType implements UserType<Identifier> {
     @Value("${hibernate.dialect:}")
     private String hibernateDialect;
 
+    /**
+     * No-args constructor required by Hibernate for direct instantiation.
+     * Dependencies will be lazily loaded from application context.
+     */
+    public IdentifierType() {
+        // Will be initialized lazily through getDatabaseTypeResolver() and getIdentifierProperties()
+    }
+
     @Autowired
     public IdentifierType(DatabaseTypeResolver databaseTypeResolver, IdentifierProperties identifierProperties) {
         this.databaseTypeResolver = Objects.requireNonNull(databaseTypeResolver, "DatabaseTypeResolver must not be null");
         this.identifierProperties = Objects.requireNonNull(identifierProperties, "IdentifierProperties must not be null");
     }
+    
+    @Override
+    public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
+        // Store static reference to application context
+        IdentifierType.applicationContext = applicationContext;
+    }
+    
+    /**
+     * Lazy getter for database type resolver
+     */
+    private DatabaseTypeResolver getDatabaseTypeResolver() {
+        if (databaseTypeResolver == null && applicationContext != null) {
+            databaseTypeResolver = applicationContext.getBean(DatabaseTypeResolver.class);
+        }
+        
+        if (databaseTypeResolver == null) {
+            // Fallback to default implementation if application context not available
+            databaseTypeResolver = new DefaultDatabaseTypeResolver();
+        }
+        
+        return databaseTypeResolver;
+    }
+    
+    /**
+     * Lazy getter for identifier properties
+     */
+    private IdentifierProperties getIdentifierProperties() {
+        if (identifierProperties == null && applicationContext != null) {
+            identifierProperties = applicationContext.getBean(IdentifierProperties.class);
+        }
+        
+        if (identifierProperties == null) {
+            // Fallback to default settings if application context not available
+            IdentifierProperties defaultProps = new IdentifierProperties();
+            defaultProps.setDefaultType("LONG");
+            defaultProps.setStringEqualityCheck(true);
+            defaultProps.setAutoConvertStringToLong(true);
+            identifierProperties = defaultProps;
+        }
+        
+        return identifierProperties;
+    }
 
     @Override
     public int getSqlType() {
         if (useNativeTypes) {
-            Identifier.Type idType = Identifier.Type.valueOf(identifierProperties.getDefaultType().toUpperCase());
-            return databaseTypeResolver.resolveSqlType(idType);
+            Identifier.Type idType = Identifier.Type.valueOf(getIdentifierProperties().getDefaultType().toUpperCase());
+            return getDatabaseTypeResolver().resolveSqlType(idType);
         }
         // Fallback to VARCHAR if native types disabled
         return Types.VARCHAR;
@@ -162,22 +218,22 @@ public class IdentifierType implements UserType<Identifier> {
      */
     public String getColumnDefinition() {
         String dialect = hibernateDialect;
-        Identifier.Type type = Identifier.Type.valueOf(identifierProperties.getDefaultType().toUpperCase());
-        return databaseTypeResolver.getColumnDefinition(type, dialect);
+        Identifier.Type type = Identifier.Type.valueOf(getIdentifierProperties().getDefaultType().toUpperCase());
+        return getDatabaseTypeResolver().getColumnDefinition(type, dialect);
     }
     
     /**
      * Check if the system is configured to use Long IDs
      */
     private boolean isLongTypeSystem() {
-        return identifierProperties != null && "LONG".equalsIgnoreCase(identifierProperties.getDefaultType());
+        return getIdentifierProperties() != null && "LONG".equalsIgnoreCase(getIdentifierProperties().getDefaultType());
     }
     
     /**
      * Check if the system is configured to use String IDs
      */
     private boolean isStringTypeSystem() {
-        return identifierProperties != null && "STRING".equalsIgnoreCase(identifierProperties.getDefaultType());
+        return getIdentifierProperties() != null && "STRING".equalsIgnoreCase(getIdentifierProperties().getDefaultType());
     }
     
     /**

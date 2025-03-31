@@ -1,5 +1,23 @@
 # Changelog
 
+## 2025-03-31: Fix Hibernate Direct Instantiation Issue
+
+### Summary
+Fixed a critical issue where Hibernate was directly instantiating the `IdentifierType` class without using Spring's dependency injection, causing `NullPointerException` due to uninitialized dependencies.
+
+### Changes
+- Made `IdentifierType` implement `ApplicationContextAware` to access the Spring application context
+- Added a no-args constructor required by Hibernate for direct instantiation
+- Implemented lazy initialization for dependencies (`DatabaseTypeResolver` and `IdentifierProperties`)
+- Added fallback default implementations when the application context is not available
+- Converted direct field accesses to use getter methods with lazy initialization
+
+### Rationale
+Hibernate instantiates custom `UserType` implementations directly using reflection, bypassing Spring's dependency injection system. This causes `NullPointerException` when the injected dependencies are accessed. The solution provides a way for the `IdentifierType` class to access its dependencies even when instantiated directly by Hibernate.
+
+### Testing
+All tests are now passing with the updated implementation.
+
 ## 2025-03-31: Remove Unused Type Prefix Constants
 
 ### Summary
