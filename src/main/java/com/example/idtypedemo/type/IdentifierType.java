@@ -23,10 +23,6 @@ import java.util.Objects;
  */
 @Component
 public class IdentifierType implements UserType<Identifier> {
-
-    // Constants for type discriminators
-    public static final String LONG_TYPE_PREFIX = "__LONG:";
-    public static final String STRING_TYPE_PREFIX = "__STRING:";
     
     private final DatabaseTypeResolver databaseTypeResolver;
     private final IdentifierProperties identifierProperties;
@@ -84,14 +80,7 @@ public class IdentifierType implements UserType<Identifier> {
         else {
             String value = rs.getString(position);
             if (value != null) {
-                if (value.startsWith(LONG_TYPE_PREFIX)) {
-                    String longValue = value.substring(LONG_TYPE_PREFIX.length());
-                    return Identifier.of(Long.valueOf(longValue));
-                } else if (value.startsWith(STRING_TYPE_PREFIX)) {
-                    return Identifier.of(value.substring(STRING_TYPE_PREFIX.length()));
-                }
-                
-                // For backward compatibility, try to parse as Long if no prefix
+                // Try to parse as Long if appropriate
                 try {
                     return Identifier.of(Long.valueOf(value));
                 } catch (NumberFormatException e) {
@@ -121,13 +110,9 @@ public class IdentifierType implements UserType<Identifier> {
         else if (isStringTypeSystem() && useNativeTypes && value.isString()) {
             st.setString(index, value.asString());
         }
-        // Otherwise, use type prefixes with VARCHAR
+        // Otherwise, use simple string representation
         else {
-            if (value.getType() == Identifier.Type.LONG) {
-                st.setString(index, LONG_TYPE_PREFIX + value.asLong());
-            } else {
-                st.setString(index, STRING_TYPE_PREFIX + value.asString());
-            }
+            st.setString(index, value.asString());
         }
     }
 
@@ -147,11 +132,7 @@ public class IdentifierType implements UserType<Identifier> {
             return null;
         }
         
-        if (value.getType() == Identifier.Type.LONG) {
-            return LONG_TYPE_PREFIX + value.asLong();
-        } else {
-            return STRING_TYPE_PREFIX + value.asString();
-        }
+        return value.asString();
     }
 
     @Override
@@ -161,13 +142,8 @@ public class IdentifierType implements UserType<Identifier> {
         }
         
         String value = cached.toString();
-        if (value.startsWith(LONG_TYPE_PREFIX)) {
-            return Identifier.of(Long.valueOf(value.substring(LONG_TYPE_PREFIX.length())));
-        } else if (value.startsWith(STRING_TYPE_PREFIX)) {
-            return Identifier.of(value.substring(STRING_TYPE_PREFIX.length()));
-        }
         
-        // For backward compatibility
+        // Try to parse as Long if possible
         try {
             return Identifier.of(Long.valueOf(value));
         } catch (NumberFormatException e) {
