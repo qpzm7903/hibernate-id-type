@@ -31,18 +31,10 @@ public class PersonController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Person> getPersonById(@PathVariable String id) {
-        // Try to parse as Long first, otherwise use as String
-        try {
-            Long longId = Long.parseLong(id);
-            return personService.findById(Identifier.of(longId))
-                    .map(ResponseEntity::ok)
-                    .orElse(ResponseEntity.notFound().build());
-        } catch (NumberFormatException e) {
-            return personService.findById(Identifier.of(id))
-                    .map(ResponseEntity::ok)
-                    .orElse(ResponseEntity.notFound().build());
-        }
+    public ResponseEntity<Person> getPersonById(@PathVariable Identifier id) {
+        return personService.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping
@@ -64,40 +56,20 @@ public class PersonController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Person> updatePerson(@PathVariable String id, @RequestBody Person person) {
-        Identifier identifier;
-        
-        try {
-            Long longId = Long.parseLong(id);
-            identifier = Identifier.of(longId);
-        } catch (NumberFormatException e) {
-            identifier = Identifier.of(id);
-        }
-        
-        Identifier finalIdentifier = identifier;
-        return personService.findById(finalIdentifier)
+    public ResponseEntity<Person> updatePerson(@PathVariable Identifier id, @RequestBody Person person) {
+        return personService.findById(id)
                 .map(existingPerson -> {
-                    person.setId(finalIdentifier);
+                    person.setId(id);
                     return ResponseEntity.ok(personService.save(person));
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deletePerson(@PathVariable String id) {
-        try {
-            Long longId = Long.parseLong(id);
-            Identifier longIdentifier = Identifier.of(longId);
-            if (personService.findById(longIdentifier).isPresent()) {
-                personService.deleteById(longIdentifier);
-                return ResponseEntity.noContent().build();
-            }
-        } catch (NumberFormatException e) {
-            Identifier stringIdentifier = Identifier.of(id);
-            if (personService.findById(stringIdentifier).isPresent()) {
-                personService.deleteById(stringIdentifier);
-                return ResponseEntity.noContent().build();
-            }
+    public ResponseEntity<Void> deletePerson(@PathVariable Identifier id) {
+        if (personService.findById(id).isPresent()) {
+            personService.deleteById(id);
+            return ResponseEntity.noContent().build();
         }
         return ResponseEntity.notFound().build();
     }
