@@ -5,19 +5,23 @@ import com.example.idtypedemo.jackson.IdentifierJacksonModule;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
+@Import(TestConfig.class)
 public class IdentifierAutoConfigurationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
     
     @Autowired
+    @Qualifier("repositoryTestIdentifierProperties")
     private IdentifierProperties properties;
 
     @Test

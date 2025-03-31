@@ -28,32 +28,28 @@ public class IdentifierType implements UserType<Identifier> {
     public static final String LONG_TYPE_PREFIX = "__LONG:";
     public static final String STRING_TYPE_PREFIX = "__STRING:";
     
-    private static DatabaseTypeResolver databaseTypeResolver;
-    private static IdentifierProperties identifierProperties;
+    private final DatabaseTypeResolver databaseTypeResolver;
+    private final IdentifierProperties identifierProperties;
     
     @Value("${identifier.use.native.types:true}")
     private boolean useNativeTypes = true;
     
     @Value("${hibernate.dialect:}")
     private String hibernateDialect;
-    
-    // Component to inject dependencies
-    @Component
-    static class IdentifierTypeInjector {
-        @Autowired
-        public IdentifierTypeInjector(DatabaseTypeResolver resolver, IdentifierProperties props) {
-            IdentifierType.databaseTypeResolver = resolver;
-            IdentifierType.identifierProperties = props;
-        }
+
+    @Autowired
+    public IdentifierType(DatabaseTypeResolver databaseTypeResolver, IdentifierProperties identifierProperties) {
+        this.databaseTypeResolver = Objects.requireNonNull(databaseTypeResolver, "DatabaseTypeResolver must not be null");
+        this.identifierProperties = Objects.requireNonNull(identifierProperties, "IdentifierProperties must not be null");
     }
 
     @Override
     public int getSqlType() {
-        if (databaseTypeResolver != null && useNativeTypes) {
+        if (useNativeTypes) {
             Identifier.Type idType = Identifier.Type.valueOf(identifierProperties.getDefaultType().toUpperCase());
             return databaseTypeResolver.resolveSqlType(idType);
         }
-        // Fallback to VARCHAR if config not available
+        // Fallback to VARCHAR if native types disabled
         return Types.VARCHAR;
     }
 
@@ -188,13 +184,10 @@ public class IdentifierType implements UserType<Identifier> {
      * Get the column definition based on the configured ID type and dialect.
      * This can be used in @Column annotations.
      */
-    public static String getColumnDefinition() {
-        if (databaseTypeResolver != null && identifierProperties != null) {
-            String dialect = getCurrentDialect();
-            Identifier.Type type = Identifier.Type.valueOf(identifierProperties.getDefaultType().toUpperCase());
-            return databaseTypeResolver.getColumnDefinition(type, dialect);
-        }
-        return "VARCHAR(255)"; // Default fallback
+    public String getColumnDefinition() {
+        String dialect = hibernateDialect;
+        Identifier.Type type = Identifier.Type.valueOf(identifierProperties.getDefaultType().toUpperCase());
+        return databaseTypeResolver.getColumnDefinition(type, dialect);
     }
     
     /**

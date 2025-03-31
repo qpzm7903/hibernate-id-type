@@ -1,5 +1,6 @@
 package com.example.idtypedemo.config;
 
+import com.example.idtypedemo.type.DatabaseTypeResolver;
 import com.example.idtypedemo.type.IdentifierType;
 import org.hibernate.boot.model.TypeContributions;
 import org.hibernate.boot.model.TypeContributor;
@@ -14,11 +15,13 @@ import org.springframework.context.annotation.Configuration;
 public class HibernateConfig {
     
     @Bean
-    public TypeContributor identifierTypeContributor() {
+    public TypeContributor identifierTypeContributor(
+            DatabaseTypeResolver databaseTypeResolver,
+            IdentifierProperties identifierProperties) {
         return new TypeContributor() {
             @Override
             public void contribute(TypeContributions typeContributions, ServiceRegistry serviceRegistry) {
-                typeContributions.contributeType(new IdentifierType());
+                typeContributions.contributeType(new IdentifierType(databaseTypeResolver, identifierProperties));
             }
         };
     }

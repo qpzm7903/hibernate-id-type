@@ -2,9 +2,11 @@ package com.example.idtypedemo.repository;
 
 import com.example.idtypedemo.domain.Identifier;
 import com.example.idtypedemo.entity.Person;
+import com.example.idtypedemo.config.TestConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.util.Optional;
@@ -13,6 +15,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @DataJpaTest
 @ActiveProfiles("h2")
+@Import(TestConfig.class)
 class PersonRepositoryTest {
 
     @Autowired
