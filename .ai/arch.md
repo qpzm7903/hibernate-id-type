@@ -365,6 +365,92 @@ public class CustomIdentifierGenerator implements IdentifierGenerator {
 }
 ```
 
+### 6. JSON序列化/反序列化
+
+#### IdentifierJsonSerializer
+
+序列化器将Identifier对象转换为JSON字符串表示：
+
+```java
+public class IdentifierJsonSerializer extends JsonSerializer<Identifier> {
+    @Override
+    public void serialize(Identifier value, JsonGenerator gen, SerializerProvider serializers) 
+            throws IOException {
+        if (value == null) {
+            gen.writeNull();
+            return;
+        }
+        // 统一序列化为字符串表示
+        gen.writeString(value.toString());
+    }
+}
+```
+
+序列化示例：
+```json
+{
+    "id": "123",             // Long类型的Identifier
+    "userId": "group-456",   // String类型的Identifier
+    "parentId": null         // null值的处理
+}
+```
+
+#### IdentifierJsonDeserializer
+
+反序列化器支持从任意字段名中提取Identifier值：
+
+```java
+public class IdentifierJsonDeserializer extends JsonDeserializer<Identifier> {
+    @Override
+    public Identifier deserialize(JsonParser p, DeserializationContext ctxt) 
+            throws IOException {
+        // 处理null值
+        if (p.getCurrentToken() == JsonToken.VALUE_NULL) {
+            return null;
+        }
+        
+        // 如果当前在字段名，移动到值
+        if (p.getCurrentToken() == JsonToken.FIELD_NAME) {
+            p.nextToken();
+        }
+        
+        // 获取字符串值，不关心字段名
+        String value = p.getValueAsString();
+        return createIdentifier(value);
+    }
+    
+    private Identifier createIdentifier(String value) {
+        if (value == null || value.isEmpty()) {
+            return null;
+        }
+        try {
+            // 优先尝试解析为Long类型
+            return Identifier.of(Long.parseLong(value));
+        } catch (NumberFormatException e) {
+            // 无法解析为Long时，使用String类型
+            return Identifier.of(value);
+        }
+    }
+}
+```
+
+反序列化支持的JSON格式示例：
+
+```json
+// 以下JSON都可以被正确反序列化
+{
+    "id": "123",            // 标准id字段
+    "userId": "user-789",   // 自定义字段名
+    "groupId": "456",       // 任意字段名都可以
+    "someId": null         // null值处理
+}
+```
+
+这种设计确保了：
+1. 字段名灵活性：支持任意字段名的Identifier值反序列化
+2. 类型智能转换：自动检测并转换为合适的Identifier类型
+3. 健壮性：优雅处理null值和空字符串
+
 ## 数据库支持
 
 ### 数据库类型映射

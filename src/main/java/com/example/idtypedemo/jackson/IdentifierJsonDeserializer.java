@@ -5,66 +5,41 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonDeserializer;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.io.IOException;
 
 /**
  * Custom JSON deserializer for the Identifier class.
- * Handles both direct values and object format with 'id' field.
- * Attempts to parse the input as a Long first, and falls back to String if that fails.
+ * Handles text values from any field name in JSON.
  */
 public class IdentifierJsonDeserializer extends JsonDeserializer<Identifier> {
     
     @Override
     public Identifier deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
-        // Handle null
+        // Handle null values
         if (p.getCurrentToken() == JsonToken.VALUE_NULL) {
             return null;
         }
-        
-        // If we're looking at a string value, treat it as a direct value
+
+        // Handle direct string values
         if (p.getCurrentToken() == JsonToken.VALUE_STRING) {
-            String value = p.getValueAsString();
-            if (value == null || value.isEmpty()) {
-                return null;
-            }
-            return createIdentifier(value);
+            return createIdentifier(p.getValueAsString());
         }
-        
-        // If we're looking at a start object token, try to find the 'id' field
+
+        // Handle object format
         if (p.getCurrentToken() == JsonToken.START_OBJECT) {
-            ObjectNode node = p.getCodec().readTree(p);
-            JsonNode idNode = node.get("id");
-            if (idNode != null) {
-                if (idNode.isNull()) {
-                    return null;
+            String value = null;
+            while (p.nextToken() != JsonToken.END_OBJECT) {
+                if (p.getCurrentToken() == JsonToken.FIELD_NAME) {
+                    p.nextToken();
+                    value = p.getValueAsString();
                 }
-                return createIdentifier(idNode.asText());
-            }
-            return null;
-        }
-        
-        // If we're looking at a field name, read the value
-        if (p.getCurrentToken() == JsonToken.FIELD_NAME && "id".equals(p.getCurrentName())) {
-            p.nextToken(); // Move to the value
-            if (p.getCurrentToken() == JsonToken.VALUE_NULL) {
-                return null;
-            }
-            String value = p.getValueAsString();
-            if (value == null || value.isEmpty()) {
-                return null;
             }
             return createIdentifier(value);
         }
-        
-        // For any other token, try to get the value as string
-        String value = p.getValueAsString();
-        if (value == null || value.isEmpty()) {
-            return null;
-        }
-        return createIdentifier(value);
+
+        // For any other token type, try to get the value as string
+        return createIdentifier(p.getValueAsString());
     }
     
     private Identifier createIdentifier(String value) {
