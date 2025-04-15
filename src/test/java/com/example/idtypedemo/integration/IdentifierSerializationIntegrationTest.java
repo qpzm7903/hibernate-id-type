@@ -1,15 +1,14 @@
 package com.example.idtypedemo.integration;
 
 import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.parser.ParserConfig;
-import com.alibaba.fastjson.serializer.SerializeConfig;
+import com.example.idtypedemo.config.FastjsonConfig;
 import com.example.idtypedemo.domain.Identifier;
-import com.example.idtypedemo.fastjson.IdentifierFastjsonDeserializer;
-import com.example.idtypedemo.fastjson.IdentifierFastjsonSerializer;
 import com.example.idtypedemo.jackson.IdentifierJacksonModule;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -17,11 +16,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * Jackson和Fastjson与Identifier的集成测试。
  * 确保两种序列化框架产生兼容的结果。
  */
+@SpringBootTest
+@Import(FastjsonConfig.class)
 public class IdentifierSerializationIntegrationTest {
     
     private ObjectMapper jacksonMapper;
-    private SerializeConfig fastjsonSerializeConfig;
-    private ParserConfig fastjsonParserConfig;
     
     /**
      * 包含Identifier字段的测试实体类
@@ -60,12 +59,7 @@ public class IdentifierSerializationIntegrationTest {
         jacksonMapper = new ObjectMapper();
         jacksonMapper.registerModule(new IdentifierJacksonModule());
         
-        // 配置Fastjson
-        fastjsonSerializeConfig = new SerializeConfig();
-        fastjsonSerializeConfig.put(Identifier.class, new IdentifierFastjsonSerializer());
-        
-        fastjsonParserConfig = new ParserConfig();
-        fastjsonParserConfig.putDeserializer(Identifier.class, new IdentifierFastjsonDeserializer());
+        // 不需要显式配置Fastjson，依赖FastjsonConfig中的全局配置
     }
     
     @Test
@@ -78,17 +72,17 @@ public class IdentifierSerializationIntegrationTest {
         String jacksonLongJson = jacksonMapper.writeValueAsString(longIdEntity);
         String jacksonStringJson = jacksonMapper.writeValueAsString(stringIdEntity);
         
-        // 使用Fastjson序列化
-        String fastjsonLongJson = JSON.toJSONString(longIdEntity, fastjsonSerializeConfig);
-        String fastjsonStringJson = JSON.toJSONString(stringIdEntity, fastjsonSerializeConfig);
+        // 使用Fastjson序列化（不需要显式传入配置）
+        String fastjsonLongJson = JSON.toJSONString(longIdEntity);
+        String fastjsonStringJson = JSON.toJSONString(stringIdEntity);
         
         // 验证序列化格式是否兼容
         assertEquals(jacksonLongJson, fastjsonLongJson, "Long ID在两个库中的序列化应该相同");
         assertEquals(jacksonStringJson, fastjsonStringJson, "String ID在两个库中的序列化应该相同");
         
-        // 用Fastjson反序列化Jackson输出
-        TestEntity crossDeserializedLong = JSON.parseObject(jacksonLongJson, TestEntity.class, fastjsonParserConfig);
-        TestEntity crossDeserializedString = JSON.parseObject(jacksonStringJson, TestEntity.class, fastjsonParserConfig);
+        // 用Fastjson反序列化Jackson输出（不需要显式传入配置）
+        TestEntity crossDeserializedLong = JSON.parseObject(jacksonLongJson, TestEntity.class);
+        TestEntity crossDeserializedString = JSON.parseObject(jacksonStringJson, TestEntity.class);
         
         // 验证跨库反序列化正常工作
         assertEquals(longIdEntity.getId(), crossDeserializedLong.getId(), "当Jackson输出被Fastjson读取时，Long ID应该被保留");
@@ -118,13 +112,13 @@ public class IdentifierSerializationIntegrationTest {
         TestEntity jacksonStringRoundTrip = jacksonMapper.readValue(jacksonStringJson, TestEntity.class);
         assertEquals(stringIdEntity.getId(), jacksonStringRoundTrip.getId(), "在Jackson往返过程中String ID应该被保留");
         
-        // Fastjson往返测试
-        String fastjsonLongJson = JSON.toJSONString(longIdEntity, fastjsonSerializeConfig);
-        TestEntity fastjsonLongRoundTrip = JSON.parseObject(fastjsonLongJson, TestEntity.class, fastjsonParserConfig);
+        // Fastjson往返测试（不需要显式传入配置）
+        String fastjsonLongJson = JSON.toJSONString(longIdEntity);
+        TestEntity fastjsonLongRoundTrip = JSON.parseObject(fastjsonLongJson, TestEntity.class);
         assertEquals(longIdEntity.getId(), fastjsonLongRoundTrip.getId(), "在Fastjson往返过程中Long ID应该被保留");
         
-        String fastjsonStringJson = JSON.toJSONString(stringIdEntity, fastjsonSerializeConfig);
-        TestEntity fastjsonStringRoundTrip = JSON.parseObject(fastjsonStringJson, TestEntity.class, fastjsonParserConfig);
+        String fastjsonStringJson = JSON.toJSONString(stringIdEntity);
+        TestEntity fastjsonStringRoundTrip = JSON.parseObject(fastjsonStringJson, TestEntity.class);
         assertEquals(stringIdEntity.getId(), fastjsonStringRoundTrip.getId(), "在Fastjson往返过程中String ID应该被保留");
     }
 } 
